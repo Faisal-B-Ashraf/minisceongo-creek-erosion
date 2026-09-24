@@ -1,0 +1,12 @@
+Item,dE_ft,dN_or_value_ft,N,Spread / note
+2022 vs 2011 horizontal offset (house roofs),+2.58,-6.09,29,2.16/1.45
+refinement from slope/aspect test on ground,-0.38,-0.27,,residual 0.47 ft
+2022 vs 2011 offset applied,+2.21,-6.37,,
+2022 lidar vs imagery frame (intensity vs NIR),+0.25,+1.74,90,3.00/3.76
+vertical bias removed (flat stable ground),,-0.080,151164,
+stable ground 0-5 deg: noise (NMAD) / 95% detection limit,,0.20,151164,0.40
+stable ground 5-15 deg: noise (NMAD) / 95% detection limit,,0.26,94950,0.50
+stable ground 15-30 deg: noise (NMAD) / 95% detection limit,,0.41,21249,0.79
+stable ground 30-60 deg: noise (NMAD) / 95% detection limit,,0.59,17254,1.16
+residual horizontal misalignment after correction,,,,0.21 ft
+"sparse-2011-sampling effect on bank position (thinning test, 10 draws)",,bias -0.03,1270,95% range +/-0.97 ft

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minisceongo Creek Bank Erosion</title>
+<meta name="description" content="How the south bank of the Minisceongo Creek 'M' bend moved between the 2011 and 2022 lidar surveys: an animated walk-through with a project assistant.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <header class="masthead">
+    <p class="eyebrow">Minisceongo Creek &middot; West Haverstraw, NY &middot; lidar 19 Nov 2011 &rarr; 15 Apr 2022</p>
+    <h1>How the south bank of the &ldquo;M&rdquo; bend moved</h1>
+    <p class="lede">An animated walk-through of the erosion study, step by step. Ask the project assistant about anything on screen: it runs an open-source language model on your own computer and answers only from the project notes.</p>
+    <div class="finding" aria-label="Key results">
+      <div><span class="num">+9.1 ft</span><span class="lbl">largest retreat toward the houses, station 74 (about 0.9 ft per year)</span></div>
+      <div><span class="num">72&ndash;75</span><span class="lbl">the one active erosion spot, where the creek leaves the dip</span></div>
+      <div><span class="num">&plusmn;1.5 ft</span><span class="lbl">rest of the south bank: no measurable change</span></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="player" aria-label="Animated walk-through">
+      <div class="step-head">
+        <span class="step-no" id="stepNo">Step 1 of 10</span>
+        <h2 id="stepTitle">The question</h2>
+      </div>
+      <div class="stage"><img id="frame" src="frames/f000.webp" width="960" height="444" alt="Animation frame"></div>
+      <div class="bar" id="bar" role="slider" aria-label="Position in the walk-through" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0"><div class="fill" id="fill"></div></div>
+      <p class="caption" id="caption" aria-live="polite"></p>
+      <div class="controls">
+        <button id="backBtn" type="button" title="Previous step (left arrow)">&#9664;&#9664; Back</button>
+        <button id="playBtn" type="button" class="primary" title="Play / pause (space)">Pause</button>
+        <button id="nextBtn" type="button" title="Next step (right arrow)">Next &#9654;&#9654;</button>
+        <button id="restartBtn" type="button">Restart</button>
+        <label class="speed" for="speedSel">Speed
+          <select id="speedSel">
+            <option value="0.5">0.5&times;</option>
+            <option value="0.75">0.75&times;</option>
+            <option value="1" selected>1&times;</option>
+            <option value="1.5">1.5&times;</option>
+            <option value="2">2&times;</option>
+          </select>
+        </label>
+      </div>
+      <ol class="steps" id="steps" aria-label="Steps"></ol>
+      <p class="hint">Space = play / pause &middot; &larr; &rarr; = previous / next step (while you are not typing) &middot; the animation pauses when you ask a question.</p>
+    </section>
+
+    <aside class="assistant" aria-label="Project assistant">
+      <div class="as-head">
+        <h2>Ask the project assistant</h2>
+        <span class="pill" id="statusPill">Notes only</span>
+      </div>
+
+      <details class="setup" id="setup">
+        <summary>Model &mdash; <span id="setupSummary">not loaded (answers show the matching notes)</span></summary>
+        <div class="inner">
+          <div class="engine" role="radiogroup" aria-label="Where the model runs">
+            <label><input type="radio" name="engine" id="engBrowser" value="browser" checked> In this browser</label>
+            <label><input type="radio" name="engine" id="engServer" value="server"> My own model server</label>
+          </div>
+          <div id="browserBox" class="inner" style="padding:0">
+            <div class="row">
+              <select id="modelSel" aria-label="Model"></select>
+              <button id="loadBtn" type="button" class="primary">Load model</button>
+            </div>
+            <div class="progress" id="progWrap" hidden><div id="progBar"></div></div>
+            <p class="small" id="modelNote"></p>
+          </div>
+          <div id="serverBox" class="inner" style="padding:0" hidden>
+            <label class="field" for="srvUrl">Server address (OpenAI-compatible chat endpoint)
+              <input type="url" id="srvUrl" value="http://localhost:11434/v1/chat/completions" spellcheck="false">
+            </label>
+            <label class="field" for="srvModel">Model name on that server
+              <input type="text" id="srvModel" value="qwen3:14b" spellcheck="false">
+            </label>
+            <div class="row"><button id="srvBtn" type="button" class="primary">Use this server</button></div>
+            <p class="small">Works with Ollama, LM Studio or llama.cpp. For Ollama, let this page connect first: close Ollama, run <code>set OLLAMA_ORIGINS=*</code> then <code>ollama serve</code> in the same window (on Mac or Linux: <code>OLLAMA_ORIGINS=* ollama serve</code>).</p>
+          </div>
+        </div>
+      </details>
+
+      <div class="context"><span>Asking about</span><strong id="ctxStep">Step 1 &middot; The question</strong><button type="button" class="linkbtn" id="clearBtn">Clear chat</button></div>
+      <div class="suggest" id="suggest" aria-label="Suggested questions"></div>
+      <div class="messages" id="messages" aria-live="polite"></div>
+
+      <form class="ask" id="askForm">
+        <label for="q" class="small">Your question</label>
+        <textarea id="q" rows="2" placeholder="e.g. Why use 40-ft squares? What does the fit score measure?"></textarea>
+        <div class="ask-row">
+          <span class="small">Enter to ask &middot; Shift+Enter for a new line</span>
+          <button type="button" id="stopBtn" hidden>Stop</button>
+          <button type="submit" id="sendBtn" class="primary">Ask</button>
+        </div>
+      </form>
+    </aside>
+  </main>
+
+  <footer>
+    <p>Data: NYS Statewide Digital Orthoimagery Program (orthos.its.ny.gov); USGS Northeast lidar, tile flown 19 Nov 2011; NYS Southeast 4 County lidar, tile flown 15 Apr 2022 (gisdata.ny.gov). Coordinates NAD83 NY State Plane East, US ft; elevations NAVD88 ft.</p>
+    <p>Desktop study using public data; not a substitute for a field inspection or a stamped engineering report. The assistant can make mistakes: check its sources, listed under each answer.</p>
+  </footer>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Inputs created by the analysis scripts (large; re-created from public sources, see the README in each folder)
+analysis/1_Imagery/*
+!analysis/1_Imagery/README.md
+analysis/1_LiDAR/*
+!analysis/1_LiDAR/README.md
+
+__pycache__/
+*.pyc
+desktop.ini
+Thumbs.db
+.DS_Store
