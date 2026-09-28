@@ -119,6 +119,18 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .steps button[aria-current="step"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .steps button[aria-current="step"] .n { color: inherit; }
 .hint { margin: 0; font-size: 12.5px; color: var(--muted); }
+/* full screen: the picture as large as the screen height allows, caption and controls underneath.
+   .expanded is the fallback where the browser has no full-screen mode for pages (iPhone). */
+.player:fullscreen, .player.expanded { background: var(--bg); padding: 18px 28px; overflow: auto; align-content: center; }
+.player.expanded { position: fixed; inset: 0; z-index: 50; }
+.player:fullscreen .stage, .player.expanded .stage,
+.player:fullscreen .bar, .player.expanded .bar {
+  width: min(100%, calc((100vh - 330px) * 960 / 444));
+  width: min(100%, calc((100dvh - 330px) * 960 / 444));
+  justify-self: center;
+}
+.player:fullscreen .caption, .player.expanded .caption { font-size: 19px; max-width: 110ch; justify-self: center; }
+.player:fullscreen .hint, .player.expanded .hint { display: none; }
 
 /* ---------- assistant ---------- */
 .assistant {

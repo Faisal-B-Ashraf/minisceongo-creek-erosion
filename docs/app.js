@@ -112,6 +112,25 @@ function togglePlay() {
   playing = !playing;
   go(cur);
 }
+// Full screen for the player; where a browser has none for pages (iPhone), the player fills the window instead.
+const isFull = () => document.fullscreenElement === $("player") || $("player").classList.contains("expanded");
+function syncFullscreen() { $("fsBtn").textContent = isFull() ? "Exit full screen" : "Full screen"; }
+function toggleFullscreen() {
+  const player = $("player");
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (player.classList.contains("expanded")) player.classList.remove("expanded");
+  else if (player.requestFullscreen) {
+    player.requestFullscreen().catch(() => player.classList.add("expanded")).finally(syncFullscreen);
+    // some embedded browsers never answer the request: fill the window instead
+    setTimeout(() => { if (!document.fullscreenElement) { player.classList.add("expanded"); syncFullscreen(); } }, 1200);
+  } else player.classList.add("expanded");
+  syncFullscreen();
+}
+function onFullscreenChange() {
+  if (document.fullscreenElement) $("player").classList.remove("expanded");
+  syncFullscreen();
+}
+
 function nextStep() { const k = stepOf(cur); if (k < MAN.steps.length - 1) go(STARTS[k + 1]); }
 function prevStep() { const k = stepOf(cur); go(cur - STARTS[k] > 2 || k === 0 ? STARTS[k] : STARTS[k - 1]); }
 
@@ -140,6 +159,9 @@ async function initPlayer() {
   $("backBtn").addEventListener("click", prevStep);
   $("restartBtn").addEventListener("click", () => { playing = true; go(0); });
   $("speedSel").addEventListener("change", (e) => { speed = parseFloat(e.target.value); schedule(); });
+  $("fsBtn").addEventListener("click", () => { toggleFullscreen(); $("fsBtn").blur(); });   // blur, so Space then plays/pauses
+  $("frame").addEventListener("dblclick", toggleFullscreen);
+  document.addEventListener("fullscreenchange", onFullscreenChange);
   const seek = (clientX) => {
     const r = $("bar").getBoundingClientRect();
     const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * TOTAL;
@@ -156,6 +178,8 @@ async function initPlayer() {
     if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     else if (e.code === "ArrowRight") { nextStep(); }
     else if (e.code === "ArrowLeft") { prevStep(); }
+    else if (e.code === "KeyF" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFullscreen(); }
+    else if (e.code === "Escape" && $("player").classList.contains("expanded")) { toggleFullscreen(); }
   });
   await Promise.all(FR.slice(0, STARTS[1]).map((_, j) => loadImage(j)));
   await go(0);
@@ -684,32 +708,30 @@ function offer() {
   localNote();
 }
 
+// The page cannot tell "not installed" from "installed but switched off": either way nothing answers. The setup file
+// covers both (it installs Ollama if needed and starts it), so everyone gets the same steps.
 function needOllama(st, m) {
-  const auto = autoSetupFile(st);
+  const win = PLATFORM === "windows";
   const lead = st === "blocked"
-    ? `<p><strong>Ollama is on this computer but does not let this page in yet.</strong>${auto ? " The setup file that fixes this is downloading now; nothing is installed again." : ""}</p>`
+    ? `<p><strong>Ollama is on this computer but does not let this page in yet.</strong>${win ? " The setup file that fixes this is downloading now; nothing is installed again." : ""}</p>`
     : st === "old"
-      ? `<p><strong>Ollama on this computer is too old for ${esc(m.name)}</strong> (it has version ${esc(ollama.version)}; the model needs ${m.requires} or newer).${auto ? " The setup file that updates it is downloading now." : ""}</p>`
-      : store.get("mce.localModel")
-        ? `<p><strong>Ollama is not running.</strong> Start <b>Ollama</b> from the Start menu (on a Mac, from Applications). This page connects as soon as it is running.</p>`
-        : `<p><strong>One-time setup.</strong> The model runs in Ollama, a free, open-source program.${auto ? " The setup file that installs it is downloading now." : ""}</p>`;
+      ? `<p><strong>Ollama on this computer is too old for ${esc(m.name)}</strong> (it has version ${esc(ollama.version)}; the model needs ${m.requires} or newer).${win ? " The setup file that updates it is downloading now." : ""}</p>`
+      : `<p><strong>One-time setup.</strong> The model runs in Ollama, a free, open-source program.${win ? " The setup file is downloading now: it installs Ollama, or just starts it if this computer already has it." : ""}</p>`;
   const then = hasModel(m.id) ? "" : ` and downloads ${esc(m.name)} (${m.size}) if it is not there yet`;
   const fileLink = `<a href="${SETUP_FILE}" download="Install_Local_AI.bat">download the setup file</a>`;
   const about = `<details class="small"><summary>What does the setup file do?</summary><p>It installs Ollama from ollama.com (about 1 GB, no administrator rights needed) or updates it, lets this walk-through's web site talk to it, and starts it. Nothing else is changed. <a href="${SETUP_SOURCE}" target="_blank" rel="noopener">Read the file</a></p></details>`;
   let steps;
-  if (PLATFORM === "windows" && !auto) {
-    steps = `<p class="small">Not on this computer any more? ${fileLink} and open it.</p>${about}`;
-  } else if (PLATFORM === "windows") {
+  if (win) {
     steps = `<ol>
       <li>Open <b>Install_Local_AI.bat</b> from your downloads (top right of the browser). If the browser warns about it, choose <b>Keep</b> (in Edge: <b>&hellip;</b>, <b>Keep</b>, then <b>Keep anyway</b>). If Windows says it protected your PC, choose <b>More info</b>, then <b>Run anyway</b>.</li>
       <li>A black window sets everything up and ends with <b>Done</b>. If an Ollama window pops up as well, close it: there is nothing to type there.</li>
       <li>Come back here: this page carries on by itself${then}.</li>
     </ol>
-    <p class="small">Download didn't start? ${fileLink} (Windows, 6&nbsp;KB).</p>${about}`;
+    <p class="small">Already have Ollama? Starting it from the Start menu works too. Download didn't start? ${fileLink} (Windows, 6&nbsp;KB).</p>${about}`;
   } else {
     const allow = PLATFORM === "mac" ? `launchctl setenv OLLAMA_ORIGINS "${location.origin}"` : `OLLAMA_ORIGINS="${location.origin}"`;
     steps = `<ol>
-      ${st === "blocked" ? "" : `<li>${st === "old" ? "Update" : "Install"} Ollama from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a> and open it.</li>`}
+      ${st === "blocked" ? "" : `<li>${st === "old" ? "Update Ollama from" : "Install Ollama (or just open it, if you have it) from"} <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a>.</li>`}
       ${LOOPBACK ? "" : PLATFORM === "mac"
         ? `<li>Let this page use it: in Terminal, run <code>${esc(allow)}</code> <button type="button" class="linkbtn" data-act="copy" data-text="${esc(allow)}">Copy</button>, then quit Ollama from the menu bar and open it again.</li>`
         : `<li>Let this page use it: set <code>${esc(allow)}</code> for the Ollama service and restart it (<a href="https://docs.ollama.com/faq" target="_blank" rel="noopener">how</a>).</li>`}
@@ -719,8 +741,7 @@ function needOllama(st, m) {
   return `${lead}${steps}<p class="small wait">Waiting for Ollama… The first start can take a minute or two.</p><div class="row"><button type="button" data-act="cancel">Cancel</button></div>`;
 }
 
-// On Windows the setup file downloads by itself, except when Ollama was used here before and only needs starting.
-const autoSetupFile = (st) => PLATFORM === "windows" && !(st === "missing" && store.get("mce.localModel"));
+// On Windows the setup file downloads by itself once the reader has said yes.
 let setupFileSent = false;
 function downloadSetupFile() {
   if (setupFileSent) return;
@@ -806,7 +827,7 @@ async function setupLocal(id) {
     if (st !== "ready" || (!hasModel(id) && !okVersion())) {
       const why = st === "ready" ? "old" : st;
       show(needOllama(why, m));
-      if (autoSetupFile(why)) downloadSetupFile();
+      if (PLATFORM === "windows") downloadSetupFile();
       const wait = run.card.querySelector(".wait");
       const found = await pollUntil(run, async () => {
         const s = await probe(2500);
@@ -973,9 +994,7 @@ async function initAssistant() {
 
 function welcome() {
   addMsg("bot", `<div class="who">Project assistant</div><p>Ask me anything about this study: why a step was done, what a number means, or what happened at a station. I answer only from the project notes and list the notes I used.</p>`);
-  const before = store.get("mce.localModel");
   if (mode === "local") addMsg("note", `Using ${esc(local.name)} on this computer (already installed, nothing to download).`);
-  else if (mode === "notes" && before && ollama.state === "missing" && PLATFORM !== "phone") setupLocal(before);   // set up before, just not running now
   else if (mode === "notes") offer();
 }
 

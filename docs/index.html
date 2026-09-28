@@ -24,7 +24,7 @@
   </header>
 
   <main class="layout">
-    <section class="player" aria-label="Animated walk-through">
+    <section class="player" id="player" aria-label="Animated walk-through">
       <div class="step-head">
         <span class="step-no" id="stepNo">Step 1 of 10</span>
         <h2 id="stepTitle">The question</h2>
@@ -37,6 +37,7 @@
         <button id="playBtn" type="button" class="primary" title="Play / pause (space)">Pause</button>
         <button id="nextBtn" type="button" title="Next step (right arrow)">Next &#9654;&#9654;</button>
         <button id="restartBtn" type="button">Restart</button>
+        <button id="fsBtn" type="button" title="Full screen (F)">Full screen</button>
         <label class="speed" for="speedSel">Speed
           <select id="speedSel">
             <option value="0.5">0.5&times;</option>
@@ -48,7 +49,7 @@
         </label>
       </div>
       <ol class="steps" id="steps" aria-label="Steps"></ol>
-      <p class="hint">Space = play / pause &middot; &larr; &rarr; = previous / next step (while you are not typing) &middot; the animation pauses when you ask a question.</p>
+      <p class="hint">Space = play / pause &middot; &larr; &rarr; = previous / next step &middot; F = full screen (while you are not typing) &middot; the animation pauses when you ask a question.</p>
     </section>
 
     <aside class="assistant" aria-label="Project assistant">
