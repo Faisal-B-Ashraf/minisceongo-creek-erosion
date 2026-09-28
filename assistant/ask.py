@@ -46,6 +46,18 @@ def stem(w):
     return w
 
 
+def stations_in(query):
+    """Station numbers named in a question: 'station 74', 'stations 72 to 75'."""
+    out = []
+    for m in re.finditer(r"\bstations?\s+(\d{1,3})(?:\s*(?:to|-|–|and|through)\s*(\d{1,3}))?", query, flags=re.I):
+        a = int(m.group(1))
+        b = int(m.group(2)) if m.group(2) else a
+        if a > 127:
+            continue
+        out += list(range(a, b + 1)) if a <= b <= 127 and b - a <= 12 else [a]
+    return sorted(set(out))
+
+
 def tokens(text, expand=False):
     out = []
     for w in re.split(r"[^a-z0-9.\-]+", text.lower()):
@@ -76,6 +88,7 @@ class Notes:
 
     def search(self, query, step=None, budget=2600):
         q, n, k1, b = set(tokens(query, True)), len(self.chunks), 1.2, 0.75
+        st = stations_in(query)
         scored = []
         for c, (tf, dl) in zip(self.chunks, self.tf):
             s = 0.0
@@ -86,11 +99,16 @@ class Notes:
                     s += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * dl / self.avgdl))
             if s > 0 and step is not None and step in c["steps"]:
                 s *= 1.35
+            s += 50 * sum(1 for k in st if f"Station {k} (" in c["text"] or f"Station {k} " in c["title"])
             scored.append((s, c))
         scored.sort(key=lambda x: -x[0])
         picked = [c for s, c in scored if s > 0][:8] or [c for c in self.chunks if step is not None and step in c["steps"]][:3]
         out, words = [], 0
         for c in picked:
+            if st and c["title"].startswith("Per-station results"):
+                lines = [l for l in c["text"].split("\n") if any(f"Station {k} (" in l for k in st)]
+                if lines:
+                    c = {**c, "text": "\n".join(lines)}
             w = len(c["text"].split())
             if out and words + w > budget:
                 continue

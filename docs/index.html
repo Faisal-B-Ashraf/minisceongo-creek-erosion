@@ -58,13 +58,21 @@
       </div>
 
       <details class="setup" id="setup">
-        <summary>Model &mdash; <span id="setupSummary">not loaded (answers show the matching notes)</span></summary>
+        <summary>Model &mdash; <span id="setupSummary">not set up (answers show the matching notes)</span></summary>
         <div class="inner">
           <div class="engine" role="radiogroup" aria-label="Where the model runs">
-            <label><input type="radio" name="engine" id="engBrowser" value="browser" checked> In this browser</label>
-            <label><input type="radio" name="engine" id="engServer" value="server"> My own model server</label>
+            <label><input type="radio" name="engine" id="engLocal" value="local" checked> On this computer</label>
+            <label><input type="radio" name="engine" id="engBrowser" value="browser"> In this browser</label>
+            <label><input type="radio" name="engine" id="engServer" value="server"> Own server</label>
           </div>
-          <div id="browserBox" class="inner" style="padding:0">
+          <div id="localBox" class="inner" style="padding:0">
+            <div class="row">
+              <select id="localSel" aria-label="Model on this computer"></select>
+              <button id="localBtn" type="button" class="primary">Set up</button>
+            </div>
+            <p class="small" id="localNote"></p>
+          </div>
+          <div id="browserBox" class="inner" style="padding:0" hidden>
             <div class="row">
               <select id="modelSel" aria-label="Model"></select>
               <button id="loadBtn" type="button" class="primary">Load model</button>
@@ -80,7 +88,7 @@
               <input type="text" id="srvModel" value="qwen3:14b" spellcheck="false">
             </label>
             <div class="row"><button id="srvBtn" type="button" class="primary">Use this server</button></div>
-            <p class="small">Works with Ollama, LM Studio or llama.cpp. For Ollama, let this page connect first: close Ollama, run <code>set OLLAMA_ORIGINS=*</code> then <code>ollama serve</code> in the same window (on Mac or Linux: <code>OLLAMA_ORIGINS=* ollama serve</code>).</p>
+            <p class="small">For LM Studio, llama.cpp or any OpenAI-compatible server that allows this page (CORS). For Ollama, use <strong>On this computer</strong> instead: it sets everything up.</p>
           </div>
         </div>
       </details>
