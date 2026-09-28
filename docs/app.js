@@ -10,9 +10,11 @@ const MODELS = [
 ];
 // Models for "On this computer": installed once through Ollama (free, open source) and kept on the PC, not in the browser.
 // size = download size; requires = oldest Ollama version that runs the model with thinking switched off.
+// The 4B is the default: most office laptops have no graphics card Ollama can use, and there the 9B takes about a
+// minute per answer.
 const LOCAL_MODELS = [
-  { id: "qwen3.5:9b", name: "Qwen3.5 9B", tag: "best answers", size: "6.6 GB", ram: "16 GB", requires: "0.17.1" },
-  { id: "qwen3.5:4b", name: "Qwen3.5 4B", tag: "lighter and faster", size: "3.4 GB", ram: "8 GB", requires: "0.17.1" },
+  { id: "qwen3.5:4b", name: "Qwen3.5 4B", tag: "recommended, quicker", size: "3.4 GB", ram: "8 GB", requires: "0.17.1" },
+  { id: "qwen3.5:9b", name: "Qwen3.5 9B", tag: "best answers, slow without a graphics card", size: "6.6 GB", ram: "16 GB", requires: "0.17.1" },
   { id: "qwen3:8b", name: "Qwen3 8B", tag: "for older Ollama versions", size: "5.2 GB", ram: "16 GB", requires: "0.9.0" },
 ];
 const OLLAMA = "http://127.0.0.1:11434";
@@ -30,7 +32,7 @@ const SUGGEST = [
   ["Which stations really moved?", "What does 'set back' mean?", "What do the blue bars mean?"],
   ["Why is the bank eroding at stations 72 to 75?", "How fast is it moving?", "What should happen next?"],
 ];
-const BUDGET = { browser: 1300, local: 1800, server: 2600, notes: 700 };   // words of project notes per question
+const BUDGET = { browser: 1300, local: 1000, server: 2600, notes: 700 };   // words of project notes per question
 const CTX_TOKENS = { browser: 3300, local: 7000 };                         // context windows: 4,096 (browser), 8,192 (Ollama)
 
 const $ = (id) => document.getElementById(id);
@@ -489,11 +491,20 @@ async function ask(question) {
   const hits = search(question, step, BUDGET[mode]);
   const { messages, used } = buildMessages(question, step, caption, hits);
   const who = mode === "browser" ? activeModel.name : mode === "local" ? local.name : server.model;
-  const box = addMsg("bot", `<div class="who">${esc(who)}</div><div class="body"><p class="thinking">Thinking…</p></div>`);
+  const box = addMsg("bot", `<div class="who">${esc(who)}</div><div class="body"></div>`);
   const body = box.querySelector(".body");
   busy = true; stopFlag = false;
   $("sendBtn").disabled = true; $("stopBtn").hidden = false;
   let text = "";
+  // until the first words arrive, count the seconds so a slow computer doesn't look frozen
+  const t0 = Date.now();
+  const waiting = () => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    body.innerHTML = `<p class="thinking">Thinking… ${s} s</p>` + (mode === "local" && s >= 15
+      ? '<p class="small">Without a graphics card the model reads the notes slowly: the first words can take up to a minute.</p>' : "");
+  };
+  waiting();
+  const ticker = setInterval(() => { if (!text) waiting(); }, 1000);
   try {
     const onText = (t) => { text = t; body.innerHTML = md(stripThink(t)) || '<p class="thinking">Thinking…</p>'; $("messages").scrollTop = $("messages").scrollHeight; };
     text = mode === "browser" ? await streamBrowser(messages, onText)
@@ -511,6 +522,7 @@ async function ask(question) {
       body.insertAdjacentHTML("beforeend", `<p class="small">Something went wrong: ${esc(msg)}.${hint}</p>`);
     }
   } finally {
+    clearInterval(ticker);
     if (stopFlag) body.insertAdjacentHTML("beforeend", "<p class=\"small\">Stopped.</p>");
     box.insertAdjacentHTML("beforeend", sourcesHtml(used));
     busy = false; abortCtl = null;
@@ -673,20 +685,27 @@ function offer() {
 }
 
 function needOllama(st, m) {
+  const auto = autoSetupFile(st);
   const lead = st === "blocked"
-    ? `<p><strong>Ollama is on this computer but does not let this page in yet.</strong> One setting fixes that; nothing is installed again.</p>`
+    ? `<p><strong>Ollama is on this computer but does not let this page in yet.</strong>${auto ? " The setup file that fixes this is downloading now; nothing is installed again." : ""}</p>`
     : st === "old"
-      ? `<p><strong>Ollama on this computer is too old for ${esc(m.name)}</strong> (it has version ${esc(ollama.version)}; the model needs ${m.requires} or newer).</p>`
-      : `<p><strong>One-time setup.</strong> The model runs in Ollama, a free, open-source program that is not on this computer yet (or is not running).</p>`;
+      ? `<p><strong>Ollama on this computer is too old for ${esc(m.name)}</strong> (it has version ${esc(ollama.version)}; the model needs ${m.requires} or newer).${auto ? " The setup file that updates it is downloading now." : ""}</p>`
+      : store.get("mce.localModel")
+        ? `<p><strong>Ollama is not running.</strong> Start <b>Ollama</b> from the Start menu (on a Mac, from Applications). This page connects as soon as it is running.</p>`
+        : `<p><strong>One-time setup.</strong> The model runs in Ollama, a free, open-source program.${auto ? " The setup file that installs it is downloading now." : ""}</p>`;
   const then = hasModel(m.id) ? "" : ` and downloads ${esc(m.name)} (${m.size}) if it is not there yet`;
+  const fileLink = `<a href="${SETUP_FILE}" download="Install_Local_AI.bat">download the setup file</a>`;
+  const about = `<details class="small"><summary>What does the setup file do?</summary><p>It installs Ollama from ollama.com (about 1 GB, no administrator rights needed) or updates it, lets this walk-through's web site talk to it, and starts it. Nothing else is changed. <a href="${SETUP_SOURCE}" target="_blank" rel="noopener">Read the file</a></p></details>`;
   let steps;
-  if (PLATFORM === "windows") {
+  if (PLATFORM === "windows" && !auto) {
+    steps = `<p class="small">Not on this computer any more? ${fileLink} and open it.</p>${about}`;
+  } else if (PLATFORM === "windows") {
     steps = `<ol>
-      <li><a class="btn primary" href="${SETUP_FILE}" download="Install_Local_AI.bat">Download the setup file</a> <span class="small">Windows,&nbsp;5&nbsp;KB</span></li>
-      <li>Open it from your downloads. If Windows says it protected your PC, choose <b>More info</b>, then <b>Run anyway</b>.</li>
+      <li>Open <b>Install_Local_AI.bat</b> from your downloads (top right of the browser). If the browser warns about it, choose <b>Keep</b> (in Edge: <b>&hellip;</b>, <b>Keep</b>, then <b>Keep anyway</b>). If Windows says it protected your PC, choose <b>More info</b>, then <b>Run anyway</b>.</li>
+      <li>A black window sets everything up and ends with <b>Done</b>. If an Ollama window pops up as well, close it: there is nothing to type there.</li>
       <li>Come back here: this page carries on by itself${then}.</li>
     </ol>
-    <details class="small"><summary>What does the setup file do?</summary><p>It installs Ollama from ollama.com (about 1 GB, no administrator rights needed) or updates it, lets this walk-through's web site talk to it, and starts it. Nothing else is changed. <a href="${SETUP_SOURCE}" target="_blank" rel="noopener">Read the file</a></p></details>`;
+    <p class="small">Download didn't start? ${fileLink} (Windows, 6&nbsp;KB).</p>${about}`;
   } else {
     const allow = PLATFORM === "mac" ? `launchctl setenv OLLAMA_ORIGINS "${location.origin}"` : `OLLAMA_ORIGINS="${location.origin}"`;
     steps = `<ol>
@@ -697,14 +716,25 @@ function needOllama(st, m) {
       <li>Come back here: this page carries on by itself${then}.</li>
     </ol>`;
   }
-  return `${lead}${steps}<p class="small wait">Waiting for Ollama…</p><div class="row"><button type="button" data-act="cancel">Cancel</button></div>`;
+  return `${lead}${steps}<p class="small wait">Waiting for Ollama… The first start can take a minute or two.</p><div class="row"><button type="button" data-act="cancel">Cancel</button></div>`;
+}
+
+// On Windows the setup file downloads by itself, except when Ollama was used here before and only needs starting.
+const autoSetupFile = (st) => PLATFORM === "windows" && !(st === "missing" && store.get("mce.localModel"));
+let setupFileSent = false;
+function downloadSetupFile() {
+  if (setupFileSent) return;
+  setupFileSent = true;
+  const a = document.createElement("a");
+  a.href = SETUP_FILE; a.download = "Install_Local_AI.bat";
+  document.body.append(a); a.click(); a.remove();
 }
 
 async function waitText(st) {
   if ((await lnaState()) === "denied") return "Your browser is blocking this page from reaching apps on this computer. Click the icon at the left of the web address, allow access to apps and devices on your network, then reload the page.";
   if (st === "blocked") return "Ollama found. Waiting for it to let this page in…";
   if (st === "ready") return `Ollama ${ollama.version} found. Waiting for the update…`;
-  return "Waiting for Ollama…";
+  return "Waiting for Ollama… The first start can take a minute or two.";
 }
 
 // Check every 3 seconds, for up to 30 minutes or until the reader cancels.
@@ -774,7 +804,9 @@ async function setupLocal(id) {
     const st = await probe(60000);
     if (st === "ready") await listLocal();
     if (st !== "ready" || (!hasModel(id) && !okVersion())) {
-      show(needOllama(st === "ready" ? "old" : st, m));
+      const why = st === "ready" ? "old" : st;
+      show(needOllama(why, m));
+      if (autoSetupFile(why)) downloadSetupFile();
       const wait = run.card.querySelector(".wait");
       const found = await pollUntil(run, async () => {
         const s = await probe(2500);
@@ -941,7 +973,9 @@ async function initAssistant() {
 
 function welcome() {
   addMsg("bot", `<div class="who">Project assistant</div><p>Ask me anything about this study: why a step was done, what a number means, or what happened at a station. I answer only from the project notes and list the notes I used.</p>`);
+  const before = store.get("mce.localModel");
   if (mode === "local") addMsg("note", `Using ${esc(local.name)} on this computer (already installed, nothing to download).`);
+  else if (mode === "notes" && before && ollama.state === "missing" && PLATFORM !== "phone") setupLocal(before);   // set up before, just not running now
   else if (mode === "notes") offer();
 }
 
